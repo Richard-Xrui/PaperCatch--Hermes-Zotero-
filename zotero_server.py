@@ -195,7 +195,7 @@ def llm_parse_query(message):
 
     try:
         req = urllib.request.Request(
-            f"{base_url.rstrip('/')}/v1/chat/completions",
+            f"{base_url.rstrip('/')}/chat/completions",
             data=json.dumps(payload).encode("utf-8"),
             headers={
                 "Content-Type": "application/json",
@@ -605,7 +605,10 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         # Try LLM-powered parsing first, fall back to rule-based
-        params = llm_parse_query(message)
+        try:
+            params = llm_parse_query(message)
+        except Exception:
+            params = None
         llm_used = params is not None
         if params is None:
             params = parse_query(message)
