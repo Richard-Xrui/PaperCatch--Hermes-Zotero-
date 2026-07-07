@@ -114,6 +114,111 @@ EN_STOPWORDS = {
 # __APPEND__
 
 
+# ── LLM-powered query parser ─────────────────────────────
+def _load_dotenv(path):
+    """Load a simple .env file (no shell expansion, no quotes handling)."""
+    if not os.path.isfile(path):
+        return
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key, val = key.strip(), val.strip()
+            if key and key not in os.environ:
+                os.environ[key] = val
+
+
+def _llm_config():
+    """Read DeepSeek config from config.local.json, env, or Hermes .env."""
+    # 1. Try config.local.json (preferred)
+    app_cfg = load_app_config()
+    llm = app_cfg.get("llm", {})
+    key = llm.get("api_key", "")
+    base = llm.get("base_url", "")
+    if key and base:
+        return key, base
+    
+    # 2. Try loading Hermes .env
+    hermes_env = os.path.join(os.path.expanduser("~"), "AppData", "Local", "hermes", ".env")
+    _load_dotenv(hermes_env)
+    key = os.environ.get("DEEPSEEK_API_KEY", "")
+    base = os.environ.get("DEEPSEEK_BASE_URL", "")
+    
+    # 3. Try current environment
+    if not key:
+        key = os.environ.get("DEEPSEEK_API_KEY", "")
+    if not base:
+        base = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+    return key, base
+
+
+def llm_parse_query(message):
+    """Use DeepSeek LLM to intelligently parse a natural-language arXiv query.
+
+    Returns the same dict shape as parse_query(), or None if LLM is unavailable.
+    """
+    api_key, base_url = _llm_config()
+    if not api_key:
+        return None
+
+    system_prompt = (
+        "You are an arXiv search assistant. Given a user's natural language request (in Chinese or English), "
+        "output ONLY a JSON object with these fields:\n"
+        '  "keywords": list of English search terms for arXiv (max 8). Translate Chinese concepts to English. '
+        'For example "大语言模型" → "large language model", "多智能体" → "multi-agent". '
+        'For ambiguous short words like "hermes", add clarifying terms if the intent is clear '
+        '(e.g. "Hermes agent" if they mean the AI agent framework, or keep as-is if unclear).\n'
+        '  "days": integer, time range in days (0 = no limit, 1 = today, 7 = this week).\n'
+        '  "max_results": integer, number of papers to return (default 8, max 50).\n'
+        '  "auto_zotero": boolean, whether the user wants to add papers to Zotero.\n'
+        '  "collection": string or null, Zotero collection path if specified (e.g. "PaperCatch/Agent").\n\n'
+        "Rules:\n"
+        "- Understand the user's INTENT, not just keywords. "
+        'If they say "最近AI safety论文" search for "AI safety" not just "AI" and "safety" separately.\n'
+        "- For short/ambiguous search terms, keep them as-is but prefer phrase search when possible.\n"
+        "- Default max_results=8, days=0 unless specified.\n"
+        "- Output ONLY the JSON, no explanation."
+    )
+
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message},
+        ],
+        "temperature": 0,
+        "max_tokens": 300,
+        "response_format": {"type": "json_object"},
+    }
+
+    try:
+        req = urllib.request.Request(
+            f"{base_url.rstrip('/')}/v1/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+        content_text = data["choices"][0]["message"]["content"]
+        parsed = json.loads(content_text)
+
+        return {
+            "keywords": parsed.get("keywords", [])[:8],
+            "days": max(0, min(60, int(parsed.get("days", 0)))),
+            "max_results": max(1, min(50, int(parsed.get("max_results", 8)))),
+            "auto_zotero": bool(parsed.get("auto_zotero", False)),
+            "collection": parsed.get("collection") or DEFAULT_COLLECTION,
+        }
+    except Exception as e:
+        pass  # LLM parse failed silently
+        return None
+
+
 def parse_query(message):
     """Parse a natural-language request into arXiv search parameters."""
     text = message.strip()
@@ -498,7 +603,12 @@ class Handler(SimpleHTTPRequestHandler):
         if not message:
             self.json_response({"success": False, "error": "请输入搜索内容"}, 400)
             return
-        params = parse_query(message)
+
+        # Try LLM-powered parsing first, fall back to rule-based
+        params = llm_parse_query(message)
+        llm_used = params is not None
+        if params is None:
+            params = parse_query(message)
         try:
             papers = arxiv_search(params["keywords"], params["max_results"], params["days"])
         except Exception as e:
@@ -530,6 +640,7 @@ class Handler(SimpleHTTPRequestHandler):
             "success": True,
             "message": msg,
             "parsed": params,
+            "llm_used": llm_used,
             "papers": papers,
         })
 
