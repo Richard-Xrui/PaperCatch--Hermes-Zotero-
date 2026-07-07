@@ -33,7 +33,11 @@ def main():
     for paper in new_papers:
         if paper["arxiv_id"] not in existing_ids:
             # Add fields expected by frontend
-            paper.setdefault("abstract_cn", "")
+            # Chinese content: set placeholders, LLM will replace later
+            paper.setdefault("title_cn", paper.get("title", "")[:80])
+            paper.setdefault("abstract_cn", paper.get("abstract", "")[:200])
+            paper.setdefault("summary_cn", "待 LLM 生成")  # placeholder
+            paper.setdefault("background_cn", "")
             paper.setdefault("affiliations", "")
             paper.setdefault("quality_score", None)
             paper.setdefault("quality_signals", {})

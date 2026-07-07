@@ -25,15 +25,15 @@ const state = {
 const $ = (id) => document.getElementById(id);
 
 document.addEventListener("DOMContentLoaded", () => {
-  Object.assign(state.filters, loadJson(STORE_KEY, {}));
-  bind();
-  hydrate();
-  loadPapers();
+Object.assign(state.filters, loadJson(STORE_KEY, {}));
+bind();
+hydrate();
+loadPapers();
 });
 
 /* ── 事件绑定 ── */
 function bind() {
-  $("searchInput").addEventListener("input", debounce(() => {
+$("searchInput").addEventListener("input", debounce(() => {
     state.filters.query = $("searchInput").value.trim();
     $("searchClear").classList.toggle("show", !!state.filters.query);
     render();
@@ -94,7 +94,7 @@ function bind() {
 
   document.querySelectorAll("[data-close]").forEach(b =>
     b.addEventListener("click", () => $(b.dataset.close).classList.remove("show")));
-  document.querySelectorAll(".modal-backdrop").forEach(m =>
+document.querySelectorAll(".modal-backdrop").forEach(m =>
     m.addEventListener("mousedown", (e) => { if (e.target === m) m.classList.remove("show"); }));
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") document.querySelectorAll(".modal-backdrop.show").forEach(m => m.classList.remove("show"));
@@ -495,11 +495,11 @@ async function deletePapers(ids, btn) {
 
 /* ── Hermes ── */
 function openHermes() {
-  if (!$("hermesMsgs").children.length) {
+if (!$("hermesMsgs").children.length) {
     addMsg("bot", "你好，我可以帮你搜 arXiv 论文。说清楚：研究方向、篇数、时间范围，以及要不要加入 Zotero。");
   }
-  $("hermesModal").classList.add("show");
-  $("hermesInput").focus();
+$("hermesModal").classList.add("show");
+$("hermesInput").focus();
 }
 
 function addMsg(role, text) {
@@ -544,19 +544,20 @@ async function sendHermes() {
 
 /* ── 搜索设置（存服务器） ── */
 async function openSettings() {
-  let cfg = { categories: ["cs.AI", "cs.CL", "cs.CV", "cs.LG"], keywords: "", max_per_cat: 25, days: 1 };
+let cfg = { categories: ["cs.AI", "cs.CL", "cs.CV", "cs.LG"], keywords: "", max_per_cat: 25, days: 1 };
   try {
     const r = await fetch("/api/config");
     if (r.ok) cfg = { ...cfg, ...(await r.json()) };
   } catch (_) {}
-  $("cfgKeywords").value = cfg.keywords || "";
+
+$("cfgKeywords").value = cfg.keywords || "";
   $("cfgMax").value = cfg.max_per_cat || 25;
   $("cfgDays").value = cfg.days ?? 1;
   $("cfgCats").innerHTML = ARXIV_CATS.map(c =>
     `<button class="chip ${cfg.categories.includes(c) ? "active" : ""}" data-c="${c}">${c}</button>`).join("");
   $("cfgCats").querySelectorAll(".chip").forEach(b =>
     b.addEventListener("click", () => b.classList.toggle("active")));
-  $("settingsModal").classList.add("show");
+$("settingsModal").classList.add("show");
 }
 
 async function saveSettings() {

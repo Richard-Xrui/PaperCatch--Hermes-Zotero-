@@ -231,7 +231,7 @@
     /* ── 模态框 ── */
     .modal-backdrop {
       position: fixed; inset: 0; z-index: 200;
-      background: rgba(26,23,20,.45); backdrop-filter: blur(3px);
+      background: rgba(26,23,20,.65); /* backdrop-filter removed for Windows compat */
       display: none; align-items: flex-start; justify-content: center;
       padding: 3rem 1.2rem;
       overflow-y: auto;
@@ -418,68 +418,7 @@
         <h2 id="modalTitle"></h2>
         <button class="btn btn-icon" data-close="detailModal">×</button>
       </div>
-      <div class="modal-body">
-        <div class="m-section">
-          <div class="chips" style="margin-bottom:.3rem">
-      ${p.quality_score != null ? `<span class="badge score">${p.quality_score.toFixed(1)} 分</span>` : ""}
-      <span class="badge ${p.zotero_status === "added" ? "added" : ""}">${p.zotero_status === "added" ? "已入库" + (p.zotero_collection ? " · " + esc(p.zotero_collection) : "") : "未入库"}</span>
-      ${p.citations != null ? `<span class="badge">引用 ${p.citations}</span>` : ""}
-      ${p.venue ? `<span class="badge">${esc(p.venue)}</span>` : ""}
-      <span class="badge">${esc(p.published || "-")}</span>
-    </div>
-  </div>`);
-
-  if (p.summary_cn) {
-    sec.push(`<div class="m-section"><h3>中文总结</h3><div class="m-text">${esc(p.summary_cn)}</div></div>`);
-  }
-  if (p.abstract_cn) {
-    sec.push(`<div class="m-section"><h3>中文摘要</h3><div class="m-text">${esc(p.abstract_cn)}</div></div>`);
-  }
-  if (p.background_cn) {
-    sec.push(`<div class="m-section"><h3>论文背景</h3><div class="m-text">${esc(p.background_cn)}</div></div>`);
-  }
-  if (!p.summary_cn && !p.abstract_cn) {
-    sec.push(`<div class="m-section"><div class="m-note">中文摘要与总结尚未生成。让 Hermes 运行增强流程即可补全（见 ENRICHMENT_PROMPT.md）。</div></div>`);
-  }
-  sec.push(`<div class="m-section"><h3>英文摘要</h3><div class="m-text m-en">${esc(p.abstract_full || p.abstract || "")}</div></div>`);
-
-  const meta = [];
-  meta.push(`<p><strong>作者：</strong>${esc(p.authors.join("、"))}</p>`);
-  if (p.affiliations) meta.push(`<p><strong>单位：</strong>${esc(p.affiliations)}</p>`);
-  meta.push(`<p><strong>分类：</strong>${esc(p.categories.join(", "))}</p>`);
-  if (p.comment) meta.push(`<p><strong>备注：</strong>${esc(p.comment)}</p>`);
-  meta.push(`<p><strong>arXiv ID：</strong>${esc(p.arxiv_id)}</p>`);
-  sec.push(`<div class="m-section"><h3>论文信息</h3>${meta.join("")}</div>`);
-
-  if (p.tags.length) {
-    sec.push(`<div class="m-section"><h3>标签</h3><div class="tags-row">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div></div>`);
-  }
-
-  sec.push(`<div class="m-section" style="display:flex;gap:.5rem;flex-wrap:wrap">
-    ${p.abs_url ? `<a class="btn" href="${escA(p.abs_url)}" target="_blank" rel="noreferrer">arXiv 页面</a>` : ""}
-    ${p.pdf_url ? `<a class="btn" href="${escA(p.pdf_url)}" target="_blank" rel="noreferrer">下载 PDF</a>` : ""}
-    <button class="btn btn-primary" id="modalZotero" ${p.zotero_status === "added" ? "disabled" : ""}>${p.zotero_status === "added" ? "✓ 已在 Zotero" : "加入 Zotero"}</button>
-    <button class="btn" id="modalDelete" style="color:var(--zhu-red);border-color:var(--zhu-red);margin-left:auto">删除此论文</button>
-  </div>`);
-
-  $("modalBody").innerHTML = sec.join("");
-  const mz = $("modalZotero");
-  if (mz && p.zotero_status !== "added") mz.addEventListener("click", () => addToZotero([p.arxiv_id], mz));
-  const md = $("modalDelete");
-  if (md) md.addEventListener("click", () => deletePapers([p.arxiv_id], md));
-  $("detailModal").classList.add("show");
-  $("detailModal").scrollTop = 0;
-}
-
-/* ── 详情 ── */
-function openDetail(p) {
-  $("modalTitle").innerHTML = p.title_cn
-    ? `${esc(p.title_cn)}<div class="title-en" style="margin-top:.3rem">${esc(p.title)}</div>`
-    : esc(p.title);
-  const sec = [];
-
-  sec.push(`<div class="m-section">
-    <div class="chips" style="margin-bottom:.3rem">
+      <div class="modal-body" id="modalBody"></div>
     </div>
   </div>
 
@@ -542,6 +481,9 @@ function openDetail(p) {
 
   <div id="toast" class="toast"></div>
 
-  <script src="app.js"></script>
+  
+<script src="app.js?v=1783412342"></script>
+
 </body>
+
 </html>
