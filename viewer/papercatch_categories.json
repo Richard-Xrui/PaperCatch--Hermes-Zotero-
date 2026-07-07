@@ -1,0 +1,42 @@
+[
+  {
+    "id": "llm",
+    "label": "大语言模型"
+  },
+  {
+    "id": "cv",
+    "label": "计算机视觉"
+  },
+  {
+    "id": "ml",
+    "label": "机器学习"
+  },
+  {
+    "id": "3d",
+    "label": "3D与重建"
+  },
+  {
+    "id": "robot",
+    "label": "机器人"
+  },
+  {
+    "id": "generate",
+    "label": "生成模型"
+  },
+  {
+    "id": "medical",
+    "label": "医学与科学"
+  },
+  {
+    "id": "code",
+    "label": "程序与符号"
+  },
+  {
+    "id": "efficient",
+    "label": "效率与压缩"
+  },
+  {
+    "id": "benchmark",
+    "label": "基准与评估"
+  }
+]

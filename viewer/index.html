@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>纸上得来 · PaperCatch</title>
+  <style>
+    :root {
+      --xuan-white: #faf8f3;
+      --xuan-warm: #f5f2ea;
+      --xuan-light: #e8e4d8;
+      --ink-soft: #6b6659;
+      --ink-deep: #2a2620;
+      --ink-black: #1a1714;
+      --zhu-red: #b5382f;
+      --zhu-light: #f6ebe9;
+      --qing-green: #3d5a45;
+      --qing-light: #eaf0eb;
+      --border: rgba(90, 86, 77, 0.18);
+      --shadow-soft: rgba(42, 38, 32, 0.07);
+      --shadow-ink: rgba(26, 23, 20, 0.14);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+    body {
+      font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", Georgia, serif;
+      line-height: 1.75;
+      color: var(--ink-deep);
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(90,86,77,.012) 3px, rgba(90,86,77,.012) 6px),
+        var(--xuan-white);
+      min-height: 100vh;
+    }
+
+    /* ── 按钮体系：button 和 a 通用 ── */
+    .btn {
+      font-family: inherit;
+      font-size: .85rem;
+      line-height: 1;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--xuan-white);
+      color: var(--ink-deep);
+      border-radius: 4px;
+      padding: .55rem .95rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .35rem;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: all .18s ease;
+      user-select: none;
+    }
+    .btn:hover { border-color: var(--ink-soft); background: var(--xuan-light); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary { background: var(--zhu-red); border-color: var(--zhu-red); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #9c2f27; border-color: #9c2f27; }
+    .btn-primary:disabled { background: var(--zhu-red); }
+    .btn-text { border-color: transparent; background: transparent; color: var(--qing-green); }
+    .btn-text:hover { background: var(--qing-light); border-color: transparent; }
+    .btn-sm { padding: .35rem .6rem; font-size: .78rem; }
+    .btn-icon { width: 34px; height: 34px; padding: 0; border-radius: 50%; }
+    .btn.added { color: var(--qing-green); border-color: var(--qing-green); background: var(--qing-light); cursor: default; }
+
+    /* ── 顶栏 ── */
+    .header {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(250,248,243,.94);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+    .header-inner {
+      max-width: 1440px; margin: 0 auto; padding: .9rem 1.5rem;
+      display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap;
+    }
+    .brand { display: flex; align-items: center; gap: .8rem; }
+    .seal {
+      width: 46px; height: 46px; background: var(--zhu-red); color: #fff;
+      border-radius: 5px; display: grid; place-items: center;
+      font-size: 1.35rem; font-weight: 700; transform: rotate(-2deg);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,.28), 0 2px 6px rgba(181,56,47,.3);
+    }
+    .brand h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: .12em; color: var(--ink-black); }
+    .brand small { font-size: .7rem; color: var(--ink-soft); letter-spacing: .28em; display: block; }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+    .time-badge { font-size: .75rem; color: var(--ink-soft); }
+
+    /* ── 搜索框 ── */
+    .search-box { flex: 1 1 280px; max-width: 460px; position: relative; }
+    .search-input {
+      width: 100%; padding: .6rem 4.6rem .6rem 2.5rem;
+      border: 1px solid var(--border); border-radius: 999px;
+      background: var(--xuan-warm); color: var(--ink-deep);
+      font-family: inherit; font-size: .9rem; outline: none;
+      transition: all .18s ease;
+    }
+    .search-input:focus { border-color: var(--qing-green); background: #fff; box-shadow: 0 0 0 3px var(--qing-light); }
+    .search-icon { position: absolute; left: .9rem; top: 50%; transform: translateY(-50%); color: var(--ink-soft); pointer-events: none; display: flex; }
+    .search-clear {
+      position: absolute; right: .55rem; top: 50%; transform: translateY(-50%);
+      border: none; background: var(--xuan-light); color: var(--ink-soft);
+      width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+      font-size: .8rem; line-height: 1; display: none; align-items: center; justify-content: center;
+    }
+    .search-clear.show { display: flex; }
+    .search-count {
+      position: absolute; right: 2.2rem; top: 50%; transform: translateY(-50%);
+      font-size: .72rem; color: var(--ink-soft); pointer-events: none; display: none;
+    }
+    .search-count.show { display: block; }
+
+    /* ── 布局 ── */
+    .container {
+      max-width: 1440px; margin: 0 auto; padding: 1.5rem;
+      display: grid; grid-template-columns: 272px minmax(0,1fr); gap: 1.5rem; align-items: start;
+    }
+    .sidebar {
+      position: sticky; top: 84px;
+      max-height: calc(100vh - 100px); overflow-y: auto;
+      background: var(--xuan-warm); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1.1rem 1.2rem;
+    }
+    .sidebar::-webkit-scrollbar { width: 6px; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--xuan-light); border-radius: 3px; }
+    .sidebar-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-bottom: .8rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem;
+    }
+    .sidebar-title { font-size: 1rem; font-weight: 600; letter-spacing: .12em; }
+    .filter-group { padding: .9rem 0; border-bottom: 1px solid var(--xuan-light); }
+    .filter-group:last-child { border-bottom: none; padding-bottom: .2rem; }
+    .filter-label {
+      font-size: .78rem; font-weight: 600; color: var(--ink-soft);
+      letter-spacing: .08em; margin-bottom: .55rem;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .chip {
+      font-family: inherit; font-size: .76rem; cursor: pointer;
+      padding: .3rem .7rem; border: 1px solid var(--border); border-radius: 999px;
+      background: var(--xuan-white); color: var(--ink-deep); transition: all .15s ease;
+    }
+    .chip:hover { border-color: var(--qing-green); }
+    .chip.active { background: var(--qing-green); border-color: var(--qing-green); color: #fff; }
+    .check-row { display: flex; align-items: center; gap: .5rem; padding: .3rem .2rem; border-radius: 4px; font-size: .82rem; cursor: pointer; }
+    .check-row:hover { background: var(--xuan-light); }
+    .check-row input { cursor: pointer; accent-color: var(--qing-green); }
+    .check-row .del {
+      margin-left: auto; border: none; background: none; color: var(--ink-soft);
+      cursor: pointer; font-size: .9rem; padding: 0 .3rem; border-radius: 3px; visibility: hidden;
+    }
+    .check-row:hover .del { visibility: visible; }
+    .check-row .del:hover { color: var(--zhu-red); }
+    input[type="date"], input[type="number"], input[type="text"], select, textarea {
+      width: 100%; padding: .45rem .6rem;
+      border: 1px solid var(--border); border-radius: 4px;
+      background: #fff; color: var(--ink-deep);
+      font-family: inherit; font-size: .82rem; outline: none; transition: border-color .15s ease;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--qing-green); box-shadow: 0 0 0 2px var(--qing-light); }
+    .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; margin-top: .5rem; }
+    input[type="range"] { width: 100%; accent-color: var(--zhu-red); }
+    .hint { font-size: .74rem; color: var(--ink-soft); margin-top: .3rem; }
+
+    /* ── 摘要栏 / 批量栏 ── */
+    .summary-bar {
+      display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;
+      background: var(--xuan-warm); border: 1px solid var(--border); border-radius: 6px;
+      padding: .7rem 1.1rem; margin-bottom: 1rem; font-size: .84rem; color: var(--ink-soft);
+    }
+    .batch-bar {
+      display: flex; justify-content: space-between; align-items: center; gap: .8rem; flex-wrap: wrap;
+      background: var(--qing-light); border: 1px solid var(--qing-green); border-radius: 6px;
+      padding: .6rem 1.1rem; margin-bottom: 1rem; font-size: .84rem;
+    }
+    .batch-left { display: flex; align-items: center; gap: .5rem; }
+    .batch-right { display: flex; gap: .5rem; }
+
+    /* ── 论文卡片 ── */
+    .paper-list { display: flex; flex-direction: column; gap: 1.1rem; }
+    .paper-card {
+      background: #fffefb; border: 1px solid var(--border); border-radius: 8px;
+      padding: 1.3rem 1.5rem; box-shadow: 0 2px 10px var(--shadow-soft);
+      transition: box-shadow .2s ease;
+    }
+    .paper-card:hover { box-shadow: 0 4px 18px var(--shadow-ink); }
+    .card-top { display: flex; align-items: flex-start; gap: .8rem; }
+    .card-check { padding-top: .35rem; }
+    .card-check input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--zhu-red); }
+    .card-titles { flex: 1; min-width: 0; cursor: pointer; }
+    .title-cn {
+      font-size: 1.18rem; font-weight: 600; line-height: 1.55;
+      color: var(--ink-black); letter-spacing: .01em;
+    }
+    .title-cn:hover { color: var(--zhu-red); }
+    .title-en {
+      font-size: .84rem; color: var(--ink-soft); line-height: 1.5; margin-top: .2rem;
+      font-family: Georgia, "Times New Roman", serif; font-style: italic;
+    }
+    .title-en a { color: inherit; text-decoration: none; }
+    .title-en a:hover { color: var(--zhu-red); text-decoration: underline; }
+    .card-badges { display: flex; flex-direction: column; gap: .35rem; align-items: flex-end; flex-shrink: 0; }
+    .badge {
+      font-size: .72rem; padding: .2rem .6rem; border-radius: 999px;
+      border: 1px solid var(--border); background: var(--xuan-warm); color: var(--ink-soft);
+      white-space: nowrap;
+    }
+    .badge.score { color: var(--zhu-red); border-color: rgba(181,56,47,.35); background: var(--zhu-light); }
+    .badge.added { color: var(--qing-green); border-color: rgba(61,90,69,.4); background: var(--qing-light); }
+    .badge.pending-cn { color: #8a6d1f; border-color: rgba(138,109,31,.3); background: #f7f1df; }
+    .meta-line { font-size: .8rem; color: var(--ink-soft); margin-top: .55rem; line-height: 1.6; }
+    .abstract {
+      font-size: .9rem; line-height: 1.85; color: #3c372e;
+      margin-top: .7rem; text-align: justify;
+    }
+    .abstract.clamped { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .expand-toggle {
+      border: none; background: none; color: var(--qing-green);
+      font-family: inherit; font-size: .78rem; cursor: pointer; padding: .2rem 0; margin-top: .1rem;
+    }
+    .expand-toggle:hover { text-decoration: underline; }
+    .tags-row { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .7rem; }
+    .tag { font-size: .72rem; padding: .18rem .6rem; border-radius: 999px; background: var(--xuan-light); color: var(--ink-soft); }
+    .card-actions {
+      display: flex; justify-content: space-between; align-items: center; gap: .8rem; flex-wrap: wrap;
+      margin-top: .9rem; padding-top: .9rem; border-top: 1px solid var(--xuan-light);
+    }
+    .card-actions-left { display: flex; gap: .45rem; flex-wrap: wrap; }
+
+    /* ── 模态框 ── */
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(26,23,20,.45); backdrop-filter: blur(3px);
+      display: none; align-items: flex-start; justify-content: center;
+      padding: 3rem 1.2rem;
+      overflow-y: auto;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal {
+      background: var(--xuan-white); border: 1px solid var(--border); border-radius: 10px;
+      width: 100%; max-width: 820px; box-shadow: 0 10px 40px var(--shadow-ink);
+    }
+    .modal-header {
+      position: sticky; top: 0; z-index: 2;
+      background: var(--xuan-warm); border-bottom: 1px solid var(--border);
+      border-radius: 10px 10px 0 0;
+      padding: 1.1rem 1.5rem; display: flex; gap: 1rem; align-items: flex-start;
+    }
+    .modal-header h2 { font-size: 1.2rem; line-height: 1.5; font-weight: 600; flex: 1; }
+    .modal-body { padding: 1.4rem 1.6rem 1.8rem; }
+    .m-section { margin-bottom: 1.4rem; }
+    .m-section h3 {
+      font-size: .92rem; font-weight: 600; color: var(--ink-black);
+      border-left: 3px solid var(--zhu-red); padding-left: .7rem;
+      margin-bottom: .6rem; letter-spacing: .06em;
+    }
+    .m-section p, .m-section .m-text { font-size: .9rem; line-height: 1.9; text-align: justify; color: #3c372e; white-space: pre-wrap; }
+    .m-en { font-family: Georgia, serif; color: var(--ink-soft); }
+    .m-note { font-size: .8rem; color: var(--ink-soft); background: var(--xuan-warm); border: 1px dashed var(--border); border-radius: 6px; padding: .7rem .9rem; line-height: 1.7; }
+
+    /* ── Hermes 对话 ── */
+    .hermes-msgs { display: flex; flex-direction: column; gap: .6rem; max-height: 340px; overflow-y: auto; margin-bottom: .9rem; }
+    .msg { padding: .65rem .9rem; border-radius: 8px; font-size: .86rem; line-height: 1.7; white-space: pre-wrap; border: 1px solid var(--border); }
+    .msg.user { background: var(--qing-light); border-color: rgba(61,90,69,.3); align-self: flex-end; max-width: 85%; }
+    .msg.bot { background: var(--xuan-warm); align-self: flex-start; max-width: 92%; }
+    .msg.loading { color: var(--ink-soft); font-style: italic; }
+    .hermes-input-row { display: flex; gap: .6rem; align-items: flex-end; }
+    .hermes-input-row textarea { flex: 1; resize: vertical; min-height: 60px; font-size: .88rem; }
+
+    /* ── 空状态 / Toast ── */
+    .empty { text-align: center; padding: 3.5rem 1.5rem; color: var(--ink-soft); border: 1px dashed var(--border); border-radius: 8px; background: rgba(255,254,251,.6); }
+    .empty .big { font-size: 2.4rem; opacity: .4; margin-bottom: .6rem; }
+    .toast {
+      position: fixed; bottom: 1.6rem; right: 1.6rem; z-index: 300;
+      background: var(--ink-black); color: #fff; border-radius: 6px;
+      padding: .8rem 1.2rem; font-size: .86rem; max-width: min(420px, 90vw);
+      opacity: 0; transform: translateY(10px); transition: all .25s ease; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: none; }
+    .toast.error { background: var(--zhu-red); }
+    .hidden { display: none !important; }
+
+    /* ── 响应式 ── */
+    @media (max-width: 1000px) {
+      .container { grid-template-columns: 1fr; padding: 1rem; }
+      .sidebar { position: static; max-height: none; }
+      .header-inner { padding: .8rem 1rem; }
+      .search-box { order: 3; max-width: none; flex-basis: 100%; }
+    }
+    @media (max-width: 620px) {
+      .paper-card { padding: 1rem; }
+      .card-badges { flex-direction: row; }
+      .card-actions { flex-direction: column; align-items: stretch; }
+      .card-actions .btn-primary { width: 100%; }
+      .modal-backdrop { padding: 1rem .6rem; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="seal">纸</div>
+        <div>
+          <h1>纸上得来</h1>
+          <small>PAPERCATCH</small>
+        </div>
+      </div>
+      <div class="search-box">
+        <span class="search-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </span>
+        <input id="searchInput" class="search-input" type="text" placeholder="搜索标题、作者、摘要、标签…" autocomplete="off">
+        <span id="searchCount" class="search-count"></span>
+        <button id="searchClear" class="search-clear" title="清空">×</button>
+      </div>
+      <div class="header-right">
+        <span id="updateTime" class="time-badge"></span>
+        <button id="refreshBtn" class="btn btn-icon" title="刷新数据">↻</button>
+        <button id="settingsBtn" class="btn">搜索设置</button>
+        <button id="hermesBtn" class="btn btn-primary">问 Hermes</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">筛 选</span>
+        <button id="resetBtn" class="btn btn-text btn-sm">重置</button>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-label">日期范围</div>
+        <div id="dateChips" class="chips"></div>
+        <div class="date-row">
+          <input type="date" id="startDate" title="开始日期">
+          <input type="date" id="endDate" title="结束日期">
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-label">
+          <span>研究方向</span>
+          <button id="addCatBtn" class="btn btn-text btn-sm" title="添加自定义方向">＋ 添加</button>
+        </div>
+        <div id="addCatForm" class="hidden" style="display:grid;gap:.4rem;margin-bottom:.6rem">
+          <input type="text" id="newCatLabel" placeholder="方向名，如：安全对齐">
+          <input type="text" id="newCatKeywords" placeholder="匹配关键词：safety, alignment">
+          <button id="saveCatBtn" class="btn btn-primary btn-sm">保存</button>
+        </div>
+        <div id="categoryList"></div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-label"><span>质量评分</span><span id="scoreValue" style="font-weight:400">不限</span></div>
+        <input type="range" id="scoreRange" min="0" max="10" step="0.5" value="0">
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-label">排序</div>
+        <select id="sortSelect">
+          <option value="date">最新发表</option>
+          <option value="quality">质量评分</option>
+          <option value="citations">引用数</option>
+          <option value="title">标题</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-label">Zotero 状态</div>
+        <div id="zoteroChips" class="chips"></div>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-label">中文内容</div>
+        <div id="cnChips" class="chips"></div>
+        <div class="hint">「待生成」的论文可让 Hermes 补全中文摘要与总结</div>
+      </div>
+
+      <div class="filter-group">
+        <label class="check-row">
+          <input type="checkbox" id="autoRefresh">
+          <span>每 5 分钟自动刷新</span>
+        </label>
+      </div>
+    </aside>
+
+    <main>
+      <div class="summary-bar">
+        <span id="summaryText">加载中…</span>
+        <span id="enrichStat"></span>
+      </div>
+
+      <div class="batch-bar">
+        <div class="batch-left">
+          <label class="check-row" style="padding:0">
+            <input type="checkbox" id="selectAll">
+            <span id="batchText">全选本页</span>
+          </label>
+        </div>
+        <div class="batch-right">
+          <button id="clearSelBtn" class="btn btn-sm hidden">取消选择</button>
+          <button id="batchDeleteBtn" class="btn btn-sm" disabled style="color:var(--zhu-red);border-color:var(--zhu-red)">批量删除</button>
+          <button id="batchZoteroBtn" class="btn btn-primary btn-sm" disabled>批量加入 Zotero</button>
+        </div>
+      </div>
+
+      <div id="paperList" class="paper-list"></div>
+    </main>
+  </div>
+
+  <!-- 详情 -->
+  <div id="detailModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalTitle"></h2>
+        <button class="btn btn-icon" data-close="detailModal">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="m-section">
+          <div class="chips" style="margin-bottom:.3rem">
+      ${p.quality_score != null ? `<span class="badge score">${p.quality_score.toFixed(1)} 分</span>` : ""}
+      <span class="badge ${p.zotero_status === "added" ? "added" : ""}">${p.zotero_status === "added" ? "已入库" + (p.zotero_collection ? " · " + esc(p.zotero_collection) : "") : "未入库"}</span>
+      ${p.citations != null ? `<span class="badge">引用 ${p.citations}</span>` : ""}
+      ${p.venue ? `<span class="badge">${esc(p.venue)}</span>` : ""}
+      <span class="badge">${esc(p.published || "-")}</span>
+    </div>
+  </div>`);
+
+  if (p.summary_cn) {
+    sec.push(`<div class="m-section"><h3>中文总结</h3><div class="m-text">${esc(p.summary_cn)}</div></div>`);
+  }
+  if (p.abstract_cn) {
+    sec.push(`<div class="m-section"><h3>中文摘要</h3><div class="m-text">${esc(p.abstract_cn)}</div></div>`);
+  }
+  if (p.background_cn) {
+    sec.push(`<div class="m-section"><h3>论文背景</h3><div class="m-text">${esc(p.background_cn)}</div></div>`);
+  }
+  if (!p.summary_cn && !p.abstract_cn) {
+    sec.push(`<div class="m-section"><div class="m-note">中文摘要与总结尚未生成。让 Hermes 运行增强流程即可补全（见 ENRICHMENT_PROMPT.md）。</div></div>`);
+  }
+  sec.push(`<div class="m-section"><h3>英文摘要</h3><div class="m-text m-en">${esc(p.abstract_full || p.abstract || "")}</div></div>`);
+
+  const meta = [];
+  meta.push(`<p><strong>作者：</strong>${esc(p.authors.join("、"))}</p>`);
+  if (p.affiliations) meta.push(`<p><strong>单位：</strong>${esc(p.affiliations)}</p>`);
+  meta.push(`<p><strong>分类：</strong>${esc(p.categories.join(", "))}</p>`);
+  if (p.comment) meta.push(`<p><strong>备注：</strong>${esc(p.comment)}</p>`);
+  meta.push(`<p><strong>arXiv ID：</strong>${esc(p.arxiv_id)}</p>`);
+  sec.push(`<div class="m-section"><h3>论文信息</h3>${meta.join("")}</div>`);
+
+  if (p.tags.length) {
+    sec.push(`<div class="m-section"><h3>标签</h3><div class="tags-row">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div></div>`);
+  }
+
+  sec.push(`<div class="m-section" style="display:flex;gap:.5rem;flex-wrap:wrap">
+    ${p.abs_url ? `<a class="btn" href="${escA(p.abs_url)}" target="_blank" rel="noreferrer">arXiv 页面</a>` : ""}
+    ${p.pdf_url ? `<a class="btn" href="${escA(p.pdf_url)}" target="_blank" rel="noreferrer">下载 PDF</a>` : ""}
+    <button class="btn btn-primary" id="modalZotero" ${p.zotero_status === "added" ? "disabled" : ""}>${p.zotero_status === "added" ? "✓ 已在 Zotero" : "加入 Zotero"}</button>
+    <button class="btn" id="modalDelete" style="color:var(--zhu-red);border-color:var(--zhu-red);margin-left:auto">删除此论文</button>
+  </div>`);
+
+  $("modalBody").innerHTML = sec.join("");
+  const mz = $("modalZotero");
+  if (mz && p.zotero_status !== "added") mz.addEventListener("click", () => addToZotero([p.arxiv_id], mz));
+  const md = $("modalDelete");
+  if (md) md.addEventListener("click", () => deletePapers([p.arxiv_id], md));
+  $("detailModal").classList.add("show");
+  $("detailModal").scrollTop = 0;
+}
+
+/* ── 详情 ── */
+function openDetail(p) {
+  $("modalTitle").innerHTML = p.title_cn
+    ? `${esc(p.title_cn)}<div class="title-en" style="margin-top:.3rem">${esc(p.title)}</div>`
+    : esc(p.title);
+  const sec = [];
+
+  sec.push(`<div class="m-section">
+    <div class="chips" style="margin-bottom:.3rem">
+    </div>
+  </div>
+
+  <!-- Hermes -->
+  <div id="hermesModal" class="modal-backdrop">
+    <div class="modal" style="max-width:680px">
+      <div class="modal-header">
+        <div style="flex:1">
+          <h2>问 Hermes</h2>
+          <div class="hint">用自然语言搜论文：说清方向、篇数、时间范围，以及要不要入 Zotero</div>
+        </div>
+        <button class="btn btn-icon" data-close="hermesModal">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="hermesMsgs" class="hermes-msgs"></div>
+        <div class="chips" style="margin-bottom:.8rem">
+          <button class="chip hermes-ex">找最近 7 天 LLM safety 论文 8 篇，并加入 Zotero</button>
+          <button class="chip hermes-ex">搜索多模态 3D 重建论文 6 篇，不入库</button>
+          <button class="chip hermes-ex">最近 3 天 RAG agent 论文 10 篇</button>
+        </div>
+        <div class="hermes-input-row">
+          <textarea id="hermesInput" placeholder="例如：帮我找最近 3 天关于视频生成的论文 5 篇（Ctrl+Enter 发送）"></textarea>
+          <button id="hermesSendBtn" class="btn btn-primary">发送</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 搜索设置 -->
+  <div id="settingsModal" class="modal-backdrop">
+    <div class="modal" style="max-width:560px">
+      <div class="modal-header">
+        <h2>每日抓取设置</h2>
+        <button class="btn btn-icon" data-close="settingsModal">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="m-section">
+          <h3>关键词</h3>
+          <input type="text" id="cfgKeywords" placeholder="agent, RAG, diffusion（逗号分隔，留空则按分类抓取）">
+        </div>
+        <div class="m-section">
+          <h3>arXiv 分类</h3>
+          <div id="cfgCats" class="chips"></div>
+        </div>
+        <div class="m-section" style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+          <div>
+            <h3>每类篇数</h3>
+            <input type="number" id="cfgMax" min="5" max="100" value="25">
+          </div>
+          <div>
+            <h3>回溯天数</h3>
+            <input type="number" id="cfgDays" min="0" max="30" value="1">
+          </div>
+        </div>
+        <button id="cfgSaveBtn" class="btn btn-primary" style="width:100%">保存设置</button>
+        <div class="hint" style="margin-top:.5rem">保存到服务器 search_config.json，每日抓取时生效</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+# Secrets & local config
+config.local.json
+.env
+
+# Runtime data (generated, not committed)
+crawled_ids.txt
+new_papers.json
+run_status.json
+papers_database.json
+pending_enrichment.json
+enrich_batch_*.json
+_summaries.json
+_summary_todo.json
+
+# Backups
+*.backup
+*.bak-*
+
+# Claude local settings
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Papers PDF (too large)
+papers/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

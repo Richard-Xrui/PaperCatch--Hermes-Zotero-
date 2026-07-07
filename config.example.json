@@ -1,0 +1,26 @@
+{
+  "zotero": {
+    "api_key": "",
+    "user_id": "",
+    "default_collection": "PaperCatch/Hermes Search",
+    "local_executable": "",
+    "local_data_dir": "",
+    "local_profile_dir": ""
+  },
+  "hermes": {
+    "api_url": "",
+    "command": "",
+    "model": "",
+    "home_dir": ""
+  },
+  "email": {
+    "enabled": false,
+    "smtp_host": "",
+    "smtp_port": 587,
+    "smtp_user": "",
+    "smtp_password": "",
+    "smtp_from": "",
+    "smtp_to": "",
+    "use_tls": true
+  }
+}
