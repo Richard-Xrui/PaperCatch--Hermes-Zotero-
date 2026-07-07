@@ -69,7 +69,7 @@ if __name__ == "__main__":
     import subprocess, sys
     result = main()
     # Auto-mark papers for enrichment
-    subprocess.run([sys.executable, str(BASE_DIR / "auto_enrich.py")],
+    subprocess.run([sys.executable, str(BASE_DIR / "enrich.py"), "--mark-pending"],
                    cwd=str(BASE_DIR), capture_output=True, timeout=30)
     exit(0 if result else 1)
     main()

@@ -70,10 +70,6 @@ def main() -> None:
         return
 
     print(f"[PIPELINE] {new_count} new papers, merging...", file=sys.stderr)
-    # Auto-enrich after merge (mark pending for LLM Chinese content)
-    print("[PIPELINE] Auto-enrich...", file=sys.stderr)
-    subprocess.run([sys.executable, str(BASE_DIR / "auto_enrich.py")],
-                   cwd=str(BASE_DIR), capture_output=True, timeout=30)
     merge = subprocess.run(
         [sys.executable, str(BASE_DIR / "merge_papers.py")],
         cwd=str(BASE_DIR),
@@ -88,7 +84,7 @@ def main() -> None:
 
     # Local enrichment: generate tags and quality scores (no external LLM needed)
     print("[PIPELINE] Local enrich (tags + scores)...", file=sys.stderr)
-    subprocess.run([sys.executable, str(BASE_DIR / "local_enrich.py")],
+    subprocess.run([sys.executable, str(BASE_DIR / "enrich.py")],
                    cwd=str(BASE_DIR), capture_output=True, timeout=30)
 
     print_agent_context(data)

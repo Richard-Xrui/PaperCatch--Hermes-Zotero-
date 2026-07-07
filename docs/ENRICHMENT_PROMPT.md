@@ -26,7 +26,7 @@ Content-Type: application/json
 或者写成文件后运行：
 
 ```bash
-python apply_enrichment.py <batch.json>
+python enrich.py <batch.json>
 ```
 
 格式示例见 `enrich_batch_1.json`。

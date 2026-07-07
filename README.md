@@ -139,8 +139,8 @@ daily_pipeline.py       每日抓取和合并
 email_digest.py         邮件日报
 cron_wrapper.py         Hermes cron 包装入口
 viewer/index.html       前端
-papers_database.json    本地论文库
-HERMES_RUNBOOK.md       给 Hermes/agent 的运行文档
+tests/                  测试脚本
+docs/                   项目文档（快速开始、运行手册等）
 ```
 
 ## 开发与测试
