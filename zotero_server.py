@@ -375,6 +375,17 @@ def merge_into_db(new_papers):
                 for k, v in p.items():
                     existing[p["arxiv_id"]].setdefault(k, v)
             else:
+                # Set Chinese placeholders for new papers (LLM will replace later)
+                p.setdefault("title_cn", p.get("title", "")[:80])
+                p.setdefault("abstract_cn", p.get("abstract", "")[:200])
+                p.setdefault("summary_cn", "待 LLM 生成")
+                p.setdefault("background_cn", "")
+                p.setdefault("affiliations", "")
+                p.setdefault("quality_score", None)
+                p.setdefault("quality_signals", {})
+                p.setdefault("zotero_status", None)
+                p.setdefault("crawled_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+                p.setdefault("tags", [])
                 existing[p["arxiv_id"]] = p
                 added += 1
         db["papers"] = list(existing.values())
@@ -619,6 +630,18 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         added = merge_into_db(papers) if papers else 0
+
+        # Auto-enrich new papers: tags + quality scores + mark pending
+        if added > 0:
+            try:
+                subprocess.run(
+                    [sys.executable, str(BASE_DIR / "enrich.py")],
+                    cwd=str(BASE_DIR), capture_output=True, timeout=30)
+                subprocess.run(
+                    [sys.executable, str(BASE_DIR / "enrich.py"), "--mark-pending"],
+                    cwd=str(BASE_DIR), capture_output=True, timeout=30)
+            except Exception:
+                pass  # enrichment is best-effort, don't block search response
 
         # optional auto-zotero
         zotero_note = ""
