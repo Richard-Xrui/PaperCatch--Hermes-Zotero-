@@ -1,24 +1,51 @@
 #!/usr/bin/env python3
-"""Cron job wrapper: runs the PaperCatch daily pipeline"""
-import subprocess, sys, os
+"""Cron job wrapper: runs the PaperCatch daily pipeline."""
 
-project_dir = os.path.dirname(os.path.abspath(__file__))  # auto-detect
-pipeline = os.path.join(project_dir, "daily_pipeline.py")
+from __future__ import annotations
 
-os.chdir(project_dir)
-result = subprocess.run(
-    [sys.executable, pipeline, "--email"],
-    cwd=project_dir,
-    capture_output=True,
-    text=True,
-    timeout=300,
-)
+import os
+import subprocess
+import sys
+from pathlib import Path
 
-# Forward stdout (this becomes the agent's context)
-print(result.stdout)
 
-# Forward stderr to real stderr for debugging
-if result.stderr:
-    print(result.stderr, file=sys.stderr)
+PROJECT_DIR = Path(__file__).resolve().parent
+PIPELINE = PROJECT_DIR / "daily_pipeline.py"
 
-sys.exit(result.returncode)
+
+def _startup_kwargs() -> dict:
+    if os.name != "nt":
+        return {}
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    return {"startupinfo": startupinfo}
+
+
+def run() -> subprocess.CompletedProcess:
+    os.chdir(PROJECT_DIR)
+    return subprocess.run(
+        [sys.executable, str(PIPELINE), "--email"],
+        cwd=str(PROJECT_DIR),
+        capture_output=True,
+        text=True,
+        timeout=300,
+        **_startup_kwargs(),
+    )
+
+
+def main() -> int:
+    try:
+        result = run()
+    except subprocess.TimeoutExpired as exc:
+        print(f"CRON_TIMEOUT: {exc}", file=sys.stderr)
+        return 1
+
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, file=sys.stderr, end="")
+    return int(result.returncode)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

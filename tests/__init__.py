@@ -1,0 +1,1 @@
+"""PaperCatch test suite."""

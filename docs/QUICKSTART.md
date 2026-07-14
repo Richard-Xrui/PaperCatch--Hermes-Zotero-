@@ -4,7 +4,7 @@
 
 ```bash
 # 1. 进入项目目录
-cd D:\Codex\papercatch
+cd D:\PaperCatch-Hermes-Zotero
 
 # 2. 启动服务（会自动打开浏览器）
 python start.py
@@ -65,9 +65,14 @@ python start.py
 
 ### 4. Hermes 智能搜索
 
-用自然语言搜索论文：
+用自然语言从已配置的公开来源搜索论文：
 - "找最近 7 天 LLM safety 论文 8 篇，并加入 Zotero"
 - "搜索多模态 3D/4D 论文 6 篇"
+
+在单篇论文上还可以：
+- 针对当前保存的摘要和已有内容提问，回答附带证据字段
+- 按问题或学习目标生成 Markdown 学习笔记
+- 当摘要不足以支持结论时明确提示需要全文
 
 ---
 
@@ -99,6 +104,8 @@ notepad config.local.json
 需要填写：
 - `zotero.api_key` - 从 https://www.zotero.org/settings/keys/new 获取
 - `zotero.user_id` - 你的 Zotero 用户 ID
+
+也可以启动网页或桌面端后进入“设置 → Zotero 集成”。已保存的 API Key 不会显示或回填，留空保存会保留原密钥。
 
 ---
 
@@ -139,6 +146,13 @@ notepad config.local.json
 - 引用统计
 - 快捷链接（arXiv, PDF）
 
+### 论文问答、学习笔记与保存 PDF
+
+- 点击 **“问这篇论文”**，基于当前已保存的标题、摘要和增强内容提问；先看 `grounded` 和证据，再使用回答。
+- 点击 **“生成学习笔记”**，填写关注点后生成 Markdown，并可直接复制到 Obsidian 或其他 Markdown 工具。
+- 只有明确开放获取的论文会显示 **“保存 PDF”**。保存期间按钮显示“保存中…”，完成后显示“PDF 已保存”；受限内容不会尝试绕过权限。
+- 源码模式默认保存到项目数据目录的 `PDFs/`；桌面打包版保存到 `%LOCALAPPDATA%\PaperCatch\PDFs`。
+
 ### 复制论文引用
 
 点击 **"复制引用"** 按钮，格式：
@@ -159,7 +173,8 @@ notepad config.local.json
 ### 搜索设置
 
 点击顶部 **"搜索设置"** 按钮：
-- 设置搜索关键词
+- 设置每日研究领域 / 关键词
+- 选择 arXiv、OpenAlex、Crossref、Semantic Scholar、Europe PMC 来源
 - 选择 arXiv 分类
 - 每类篇数限制
 - 搜索天数范围
@@ -192,11 +207,13 @@ python daily_pipeline.py --days 3 --max-per-cat 10
 3. 确认数据库有论文数据
 
 ### Q: Hermes 搜索失败？
-**A**: Hermes 需要配置：
+**A**: `/hermes/search` 不要求本机 Hermes 可执行文件。需要 LLM 解析时配置：
 ```bash
-python start.py --setup
-# 或设置环境变量 HERMES_API_URL / HERMES_COMMAND
+# config.local.json: llm.api_key / llm.base_url
+# 或环境变量 DEEPSEEK_API_KEY / DEEPSEEK_BASE_URL
 ```
+
+LLM 不可用时会自动回落到内置规则解析器；如果整个请求失败，先检查 `python start.py` 的服务日志和 arXiv 网络访问。
 
 ---
 

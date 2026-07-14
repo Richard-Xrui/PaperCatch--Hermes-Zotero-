@@ -12,6 +12,13 @@ enrich_batch_*.json
 _summaries.json
 _summary_todo.json
 
+# Atomic JSON store runtime files
+*.json.lock
+*.json.*.tmp
+codex-work/
+/build/
+/dist/
+
 # Backups
 *.backup
 *.bak-*
@@ -24,8 +31,13 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Desktop packaging output
+/build/
+/dist/
+
 # Papers PDF (too large)
 papers/
+/PDFs/
 
 # IDE
 .vscode/

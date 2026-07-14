@@ -7,5 +7,6 @@
   ],
   "keywords": "Agent memory",
   "max_per_cat": 25,
-  "days": 0
+  "days": 0,
+  "sources": ["arxiv", "openalex", "crossref", "semantic_scholar", "europe_pmc"]
 }

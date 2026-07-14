@@ -1,140 +1,123 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-PaperCatch 功能演示脚本
-测试所有核心功能是否正常工作
-"""
+"""Isolated feature tests for the PaperCatch HTTP service."""
 
-import sys
-import io
-import requests
-import json
-import time
-from datetime import datetime
+import unittest
 
-# 修复 Windows 控制台编码问题
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+if __package__:
+    from .server_harness import IsolatedServerTestCase
+else:
+    from server_harness import IsolatedServerTestCase
 
-BASE_URL = "http://localhost:8765"
 
-def test_api(name, url, method="GET", data=None, expected_keys=None):
-    """测试 API 端点"""
-    try:
-        if method == "GET":
-            response = requests.get(url, timeout=10)
-        elif method == "POST":
-            response = requests.post(url, json=data, timeout=10)
+class FeatureTests(IsolatedServerTestCase):
+    def test_health(self):
+        status, headers, payload = self.request_json("GET", "/health")
 
-        if response.status_code == 200:
-            result = response.json()
-            if expected_keys:
-                missing = [k for k in expected_keys if k not in result]
-                if missing:
-                    print(f"❌ {name}: 缺少字段 {missing}")
-                    return False
-            print(f"✅ {name}: 正常")
-            return True
-        else:
-            print(f"❌ {name}: HTTP {response.status_code}")
-            return False
-    except Exception as e:
-        print(f"❌ {name}: {e}")
-        return False
+        self.assertEqual(200, status)
+        self.assertTrue(headers["content-type"].startswith("application/json"))
+        self.assertEqual({"status": "ok", "service": "PaperCatch"}, payload)
 
-def main():
-    print("=" * 60)
-    print("PaperCatch 功能测试")
-    print("=" * 60)
-    print()
+    def test_papers_api(self):
+        status, _, payload = self.request_json("GET", "/api/papers")
 
-    # 1. 健康检查
-    print("🔍 测试基础功能...")
-    test_api(
-        "健康检查",
-        f"{BASE_URL}/health",
-        expected_keys=["status", "service"]
-    )
+        self.assertEqual(200, status)
+        self.assertEqual(2, payload["total_count"])
+        self.assertEqual(
+            ["2401.00001", "2401.00002"],
+            [paper["arxiv_id"] for paper in payload["papers"]],
+        )
+        self.assertEqual("2026-07-12T00:00:00+00:00", payload["updated_at"])
 
-    # 2. 论文列表
-    test_api(
-        "论文列表 API",
-        f"{BASE_URL}/api/papers",
-        expected_keys=["papers", "total_count", "updated_at"]
-    )
+    def test_categories_api(self):
+        status, _, payload = self.request_json("GET", "/api/categories")
 
-    # 3. 分类列表
-    test_api(
-        "分类列表 API",
-        f"{BASE_URL}/api/categories"
-    )
+        self.assertEqual(200, status)
+        self.assertEqual("llm", payload[0]["id"])
+        self.assertEqual("大语言模型", payload[0]["label"])
 
-    # 4. 配置信息
-    test_api(
-        "配置信息 API",
-        f"{BASE_URL}/api/config"
-    )
+    def test_config_api(self):
+        status, _, payload = self.request_json("GET", "/api/config")
 
-    print()
-    print("🎨 测试前端资源...")
+        self.assertEqual(200, status)
+        self.assertEqual(self.initial_config, payload)
 
-    # 5. 前端首页
-    try:
-        response = requests.get(BASE_URL, timeout=10)
-        if response.status_code == 200:
-            # 检查中文标题
-            content = response.text
-            if "纸上得来" in content or "PaperCatch" in content:
-                print("✅ 前端首页: 正常")
-            else:
-                print("❌ 前端首页: 内容异常")
-        else:
-            print(f"❌ 前端首页: HTTP {response.status_code}")
-    except Exception as e:
-        print(f"❌ 前端首页: {e}")
+    def test_sources_api_lists_public_adapters(self):
+        status, _, payload = self.request_json("GET", "/api/sources")
 
-    print()
-    print("📊 数据统计...")
+        self.assertEqual(200, status)
+        self.assertEqual(
+            ["arxiv", "openalex", "crossref", "semantic_scholar", "europe_pmc"],
+            payload["sources"],
+        )
 
-    # 获取论文统计
-    try:
-        response = requests.get(f"{BASE_URL}/api/papers", timeout=10)
-        data = response.json()
-        papers = data.get("papers", [])
+    def test_config_fallback_can_be_saved_again(self):
+        self.config_path.unlink()
 
-        print(f"  总论文数: {data.get('total_count', 0)}")
-        print(f"  最后更新: {data.get('updated_at', 'N/A')}")
+        status, _, payload = self.request_json("GET", "/api/config")
+        self.assertEqual(200, status)
+        self.assertIn("keywords", payload)
 
-        if papers:
-            # 分类统计
-            categories = {}
-            for paper in papers:
-                for cat in paper.get("categories", []):
-                    categories[cat] = categories.get(cat, 0) + 1
+        save_status, _, save_payload = self.request_json("POST", "/api/config", payload)
+        self.assertEqual(200, save_status)
+        self.assertTrue(save_payload["success"])
 
-            print(f"  分类分布:")
-            for cat, count in sorted(categories.items(), key=lambda x: -x[1])[:5]:
-                print(f"    - {cat}: {count} 篇")
+    def test_valid_config_update_is_written_to_both_locations(self):
+        updated = {
+            "categories": ["cs.CV"],
+            "keywords": "vision agent",
+            "max_per_cat": 8,
+            "days": 1,
+        }
 
-            # 评分统计
-            scored = [p for p in papers if p.get("quality_score") is not None]
-            if scored:
-                avg_score = sum(p["quality_score"] for p in scored) / len(scored)
-                print(f"  平均评分: {avg_score:.2f} ({len(scored)} 篇已评分)")
-        else:
-            print("  ⚠️  当前没有论文数据")
-            print("     运行: python daily_pipeline.py --days 3 --max-per-cat 10")
+        status, _, payload = self.request_json("POST", "/api/config", updated)
 
-    except Exception as e:
-        print(f"  ❌ 统计失败: {e}")
+        self.assertEqual(200, status)
+        self.assertTrue(payload["success"])
+        self.assertEqual(updated, self.read_json(self.config_path))
+        self.assertEqual(updated, self.read_json(self.viewer_config_path))
 
-    print()
-    print("=" * 60)
-    print("测试完成！")
-    print()
-    print("🌐 访问地址: http://localhost:8765")
-    print("📚 使用指南: QUICKSTART.md")
-    print("📝 更新日志: CHANGELOG.md")
-    print("=" * 60)
+    def test_multi_source_config_is_written_to_both_locations(self):
+        updated = {
+            **self.initial_config,
+            "sources": ["arxiv", "openalex", "europe_pmc"],
+        }
+
+        status, _, payload = self.request_json("POST", "/api/config", updated)
+
+        self.assertEqual(200, status)
+        self.assertTrue(payload["success"])
+        self.assertEqual(updated, self.read_json(self.config_path))
+        self.assertEqual(updated, self.read_json(self.viewer_config_path))
+
+    def test_valid_categories_update_is_written_to_both_locations(self):
+        updated = [
+            {"id": "agent", "label": "智能体", "keywords": "agent,memory"},
+            {"id": "cv", "label": "计算机视觉"},
+        ]
+
+        status, _, payload = self.request_json("POST", "/api/categories", updated)
+
+        self.assertEqual(200, status)
+        self.assertTrue(payload["success"])
+        self.assertEqual(updated, self.read_json(self.cats_path))
+        self.assertEqual(
+            updated,
+            self.read_json(self.viewer_dir / "papercatch_categories.json"),
+        )
+
+    def test_frontend_index(self):
+        status, headers, body = self.request("GET", "/")
+
+        self.assertEqual(200, status)
+        self.assertTrue(headers["content-type"].startswith("text/html"))
+        self.assertIn("PaperCatch", body.decode("utf-8"))
+
+    def test_frontend_script(self):
+        status, headers, body = self.request("GET", "/app.js")
+
+        self.assertEqual(200, status)
+        self.assertTrue(headers["content-type"].startswith("application/javascript"))
+        self.assertIn("papercatch", body.decode("utf-8"))
+
 
 if __name__ == "__main__":
-    main()
+    unittest.main()

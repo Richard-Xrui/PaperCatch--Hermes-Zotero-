@@ -1,0 +1,1 @@
+"""PaperCatch Windows desktop shell."""

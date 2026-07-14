@@ -8,8 +8,11 @@ import os
 from pathlib import Path
 from typing import Any
 
+from json_store import write_json_atomic
 
-BASE_DIR = Path(__file__).resolve().parent
+
+MODULE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(os.environ.get("PAPERCATCH_DATA_DIR", MODULE_DIR)).expanduser().resolve()
 CONFIG_FILE = BASE_DIR / "config.local.json"
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -62,10 +65,11 @@ ENV_MAP = {
 }
 
 
-def load_config() -> dict[str, Any]:
+def load_config(config_file: Path | None = None) -> dict[str, Any]:
+    config_path = CONFIG_FILE if config_file is None else Path(config_file)
     config = json.loads(json.dumps(DEFAULT_CONFIG))
-    if CONFIG_FILE.exists():
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+    if config_path.exists():
+        with open(config_path, "r", encoding="utf-8") as f:
             file_config = json.load(f)
         deep_update(config, file_config)
 
@@ -80,9 +84,7 @@ def load_config() -> dict[str, Any]:
 def save_config(config: dict[str, Any]) -> None:
     merged = json.loads(json.dumps(DEFAULT_CONFIG))
     deep_update(merged, config)
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(merged, f, ensure_ascii=False, indent=2)
-        f.write("\n")
+    write_json_atomic(CONFIG_FILE, merged)
 
 
 def deep_update(target: dict[str, Any], source: dict[str, Any]) -> dict[str, Any]:

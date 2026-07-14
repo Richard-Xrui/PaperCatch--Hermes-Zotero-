@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
   <title>纸上得来 · PaperCatch</title>
   <style>
     :root {
@@ -128,6 +129,8 @@
       padding-bottom: .8rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem;
     }
     .sidebar-title { font-size: 1rem; font-weight: 600; letter-spacing: .12em; }
+    .filter-toggle, .filter-toggle-label { display: none; }
+    .filter-content { min-width: 0; }
     .filter-group { padding: .9rem 0; border-bottom: 1px solid var(--xuan-light); }
     .filter-group:last-child { border-bottom: none; padding-bottom: .2rem; }
     .filter-label {
@@ -152,14 +155,14 @@
     }
     .check-row:hover .del { visibility: visible; }
     .check-row .del:hover { color: var(--zhu-red); }
-    input[type="date"], input[type="number"], input[type="text"], select, textarea {
+    input[type="date"], input[type="number"], input[type="text"]:not(.search-input), input[type="password"], select, textarea {
       width: 100%; padding: .45rem .6rem;
       border: 1px solid var(--border); border-radius: 4px;
       background: #fff; color: var(--ink-deep);
       font-family: inherit; font-size: .82rem; outline: none; transition: border-color .15s ease;
     }
     input:focus, select:focus, textarea:focus { border-color: var(--qing-green); box-shadow: 0 0 0 2px var(--qing-light); }
-    .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; margin-top: .5rem; }
+    .date-row { display: grid; grid-template-columns: 1fr; gap: .45rem; margin-top: .5rem; }
     input[type="range"] { width: 100%; accent-color: var(--zhu-red); }
     .hint { font-size: .74rem; color: var(--ink-soft); margin-top: .3rem; }
 
@@ -258,6 +261,9 @@
     .m-section p, .m-section .m-text { font-size: .9rem; line-height: 1.9; text-align: justify; color: #3c372e; white-space: pre-wrap; }
     .m-en { font-family: Georgia, serif; color: var(--ink-soft); }
     .m-note { font-size: .8rem; color: var(--ink-soft); background: var(--xuan-warm); border: 1px dashed var(--border); border-radius: 6px; padding: .7rem .9rem; line-height: 1.7; }
+    .cfg-field { display: grid; gap: .35rem; margin-top: .75rem; }
+    .cfg-field label { font-size: .8rem; font-weight: 600; color: var(--ink-soft); }
+    .zotero-status.configured { color: var(--qing-green); border-color: rgba(61,90,69,.38); background: var(--qing-light); }
 
     /* ── Hermes 对话 ── */
     .hermes-msgs { display: flex; flex-direction: column; gap: .6rem; max-height: 340px; overflow-y: auto; margin-bottom: .9rem; }
@@ -284,13 +290,45 @@
     /* ── 响应式 ── */
     @media (max-width: 1000px) {
       .container { grid-template-columns: 1fr; padding: 1rem; }
-      .sidebar { position: static; max-height: none; }
+      .sidebar {
+        position: static; max-height: none; overflow: visible;
+        display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: .65rem;
+        padding: .8rem 1rem;
+      }
+      .sidebar-header { grid-column: 1 / -1; padding-bottom: .65rem; margin-bottom: .65rem; }
+      .filter-toggle {
+        display: block; grid-column: 2; grid-row: 2; align-self: center;
+        width: 16px; height: 16px; cursor: pointer; accent-color: var(--qing-green);
+      }
+      .filter-toggle-label {
+        display: block; grid-column: 1; grid-row: 2;
+        font-size: .82rem; color: var(--ink-soft); cursor: pointer;
+      }
+      .filter-content { display: none; grid-column: 1 / -1; min-width: 0; margin-top: .65rem; }
+      .filter-toggle:checked ~ .filter-content { display: block; }
       .header-inner { padding: .8rem 1rem; }
       .search-box { order: 3; max-width: none; flex-basis: 100%; }
     }
     @media (max-width: 620px) {
+      body.toast-visible { padding-top: var(--toast-height, 0px); }
+      body.toast-visible .header { top: var(--toast-height, 0px); }
+      body.toast-visible .modal-backdrop.show { top: var(--toast-height, 0px); }
+      .toast {
+        top: 0; bottom: auto; left: 0; right: 0;
+        max-width: none; border-radius: 0; text-align: center;
+        transform: translateY(-100%);
+      }
       .paper-card { padding: 1rem; }
-      .card-badges { flex-direction: row; }
+      .card-top {
+        display: grid; grid-template-columns: 16px minmax(0, 1fr);
+        column-gap: .8rem; row-gap: .55rem;
+      }
+      .card-check { grid-column: 1; grid-row: 1; }
+      .card-titles { grid-column: 2; grid-row: 1; }
+      .card-badges {
+        grid-column: 2; grid-row: 2; flex-direction: row; flex-wrap: wrap;
+        justify-content: flex-start; align-items: center;
+      }
       .card-actions { flex-direction: column; align-items: stretch; }
       .card-actions .btn-primary { width: 100%; }
       .modal-backdrop { padding: 1rem .6rem; }
@@ -318,7 +356,7 @@
       <div class="header-right">
         <span id="updateTime" class="time-badge"></span>
         <button id="refreshBtn" class="btn btn-icon" title="刷新数据">↻</button>
-        <button id="settingsBtn" class="btn">搜索设置</button>
+        <button id="settingsBtn" class="btn">设置</button>
         <button id="hermesBtn" class="btn btn-primary">问 Hermes</button>
       </div>
     </div>
@@ -331,59 +369,65 @@
         <button id="resetBtn" class="btn btn-text btn-sm">重置</button>
       </div>
 
-      <div class="filter-group">
-        <div class="filter-label">日期范围</div>
-        <div id="dateChips" class="chips"></div>
-        <div class="date-row">
-          <input type="date" id="startDate" title="开始日期">
-          <input type="date" id="endDate" title="结束日期">
+      <input id="filterToggle" class="filter-toggle" type="checkbox" aria-controls="filterContent" aria-expanded="false">
+      <label id="filterToggleLabel" class="filter-toggle-label" for="filterToggle">展开全部筛选条件</label>
+
+      <div id="filterContent" class="filter-content">
+
+        <div class="filter-group">
+          <div class="filter-label">日期范围</div>
+          <div id="dateChips" class="chips"></div>
+          <div class="date-row">
+            <input type="date" id="startDate" title="开始日期">
+            <input type="date" id="endDate" title="结束日期">
+          </div>
         </div>
-      </div>
 
-      <div class="filter-group">
-        <div class="filter-label">
-          <span>研究方向</span>
-          <button id="addCatBtn" class="btn btn-text btn-sm" title="添加自定义方向">＋ 添加</button>
+        <div class="filter-group">
+          <div class="filter-label">
+            <span>研究方向</span>
+            <button id="addCatBtn" class="btn btn-text btn-sm" title="添加自定义方向">＋ 添加</button>
+          </div>
+          <div id="addCatForm" class="hidden" style="display:grid;gap:.4rem;margin-bottom:.6rem">
+            <input type="text" id="newCatLabel" placeholder="方向名，如：安全对齐">
+            <input type="text" id="newCatKeywords" placeholder="匹配关键词：safety, alignment">
+            <button id="saveCatBtn" class="btn btn-primary btn-sm">保存</button>
+          </div>
+          <div id="categoryList"></div>
         </div>
-        <div id="addCatForm" class="hidden" style="display:grid;gap:.4rem;margin-bottom:.6rem">
-          <input type="text" id="newCatLabel" placeholder="方向名，如：安全对齐">
-          <input type="text" id="newCatKeywords" placeholder="匹配关键词：safety, alignment">
-          <button id="saveCatBtn" class="btn btn-primary btn-sm">保存</button>
+
+        <div class="filter-group">
+          <div class="filter-label"><span>质量评分</span><span id="scoreValue" style="font-weight:400">不限</span></div>
+          <input type="range" id="scoreRange" min="0" max="10" step="0.5" value="0">
         </div>
-        <div id="categoryList"></div>
-      </div>
 
-      <div class="filter-group">
-        <div class="filter-label"><span>质量评分</span><span id="scoreValue" style="font-weight:400">不限</span></div>
-        <input type="range" id="scoreRange" min="0" max="10" step="0.5" value="0">
-      </div>
+        <div class="filter-group">
+          <div class="filter-label">排序</div>
+          <select id="sortSelect">
+            <option value="date">最新发表</option>
+            <option value="quality">质量评分</option>
+            <option value="citations">引用数</option>
+            <option value="title">标题</option>
+          </select>
+        </div>
 
-      <div class="filter-group">
-        <div class="filter-label">排序</div>
-        <select id="sortSelect">
-          <option value="date">最新发表</option>
-          <option value="quality">质量评分</option>
-          <option value="citations">引用数</option>
-          <option value="title">标题</option>
-        </select>
-      </div>
+        <div class="filter-group">
+          <div class="filter-label">Zotero 状态</div>
+          <div id="zoteroChips" class="chips"></div>
+        </div>
 
-      <div class="filter-group">
-        <div class="filter-label">Zotero 状态</div>
-        <div id="zoteroChips" class="chips"></div>
-      </div>
+        <div class="filter-group">
+          <div class="filter-label">中文内容</div>
+          <div id="cnChips" class="chips"></div>
+          <div class="hint">「待生成」的论文可让 Hermes 补全中文摘要与总结</div>
+        </div>
 
-      <div class="filter-group">
-        <div class="filter-label">中文内容</div>
-        <div id="cnChips" class="chips"></div>
-        <div class="hint">「待生成」的论文可让 Hermes 补全中文摘要与总结</div>
-      </div>
-
-      <div class="filter-group">
-        <label class="check-row">
-          <input type="checkbox" id="autoRefresh">
-          <span>每 5 分钟自动刷新</span>
-        </label>
+        <div class="filter-group">
+          <label class="check-row">
+            <input type="checkbox" id="autoRefresh">
+            <span>每 5 分钟自动刷新</span>
+          </label>
+        </div>
       </div>
     </aside>
 
@@ -412,25 +456,25 @@
   </div>
 
   <!-- 详情 -->
-  <div id="detailModal" class="modal-backdrop">
-    <div class="modal">
+  <div id="detailModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1">
       <div class="modal-header">
         <h2 id="modalTitle"></h2>
-        <button class="btn btn-icon" data-close="detailModal">×</button>
+        <button class="btn btn-icon" data-close="detailModal" aria-label="关闭论文详情">×</button>
       </div>
       <div class="modal-body" id="modalBody"></div>
     </div>
   </div>
 
   <!-- Hermes -->
-  <div id="hermesModal" class="modal-backdrop">
-    <div class="modal" style="max-width:680px">
+  <div id="hermesModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="hermesModalTitle" tabindex="-1" style="max-width:680px">
       <div class="modal-header">
         <div style="flex:1">
-          <h2>问 Hermes</h2>
+          <h2 id="hermesModalTitle">问 Hermes</h2>
           <div class="hint">用自然语言搜论文：说清方向、篇数、时间范围，以及要不要入 Zotero</div>
         </div>
-        <button class="btn btn-icon" data-close="hermesModal">×</button>
+        <button class="btn btn-icon" data-close="hermesModal" aria-label="关闭 Hermes">×</button>
       </div>
       <div class="modal-body">
         <div id="hermesMsgs" class="hermes-msgs"></div>
@@ -448,20 +492,26 @@
   </div>
 
   <!-- 搜索设置 -->
-  <div id="settingsModal" class="modal-backdrop">
-    <div class="modal" style="max-width:560px">
+  <div id="settingsModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle" tabindex="-1" style="max-width:560px">
       <div class="modal-header">
-        <h2>每日抓取设置</h2>
-        <button class="btn btn-icon" data-close="settingsModal">×</button>
+        <h2 id="settingsModalTitle">搜索与集成设置</h2>
+        <button class="btn btn-icon" data-close="settingsModal" aria-label="关闭设置">×</button>
       </div>
       <div class="modal-body">
         <div class="m-section">
-          <h3>关键词</h3>
-          <input type="text" id="cfgKeywords" placeholder="agent, RAG, diffusion（逗号分隔，留空则按分类抓取）">
+          <h3>每日研究领域 / 关键词</h3>
+          <input type="text" id="cfgKeywords" placeholder="肿瘤免疫、单细胞、机器人，或 agent, RAG, diffusion">
+          <div class="hint">可以填写任意学科方向或关键词，多源检索会按这些词抓取。</div>
         </div>
         <div class="m-section">
           <h3>arXiv 分类</h3>
           <div id="cfgCats" class="chips"></div>
+        </div>
+        <div class="m-section">
+          <h3>检索来源</h3>
+          <div id="sourceChips" class="chips"></div>
+          <div class="hint">可多选，保存后会同步到 `sources` 配置。</div>
         </div>
         <div class="m-section" style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
           <div>
@@ -473,16 +523,93 @@
             <input type="number" id="cfgDays" min="0" max="30" value="1">
           </div>
         </div>
-        <button id="cfgSaveBtn" class="btn btn-primary" style="width:100%">保存设置</button>
-        <div class="hint" style="margin-top:.5rem">保存到服务器 search_config.json，每日抓取时生效</div>
+        <button id="cfgSaveBtn" class="btn btn-primary" type="button" style="width:100%">保存抓取设置</button>
+        <div class="hint" style="margin-top:.5rem">用于每日论文抓取任务</div>
+
+        <div class="m-section" style="margin-top:1.6rem;padding-top:1.4rem;border-top:1px solid var(--border)">
+          <h3>Zotero 集成</h3>
+          <div id="zoteroCfgStatus" class="m-note zotero-status unconfigured" role="status" aria-live="polite">正在读取配置…</div>
+          <div class="cfg-field">
+            <label for="zoteroUserId">Zotero User ID</label>
+            <input type="text" id="zoteroUserId" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,20}" maxlength="20" required placeholder="例如：1234567">
+          </div>
+          <div class="cfg-field">
+            <label for="zoteroApiKey">Zotero API Key</label>
+            <input type="password" id="zoteroApiKey" autocomplete="new-password" maxlength="256" placeholder="留空则保留已有密钥">
+            <div class="hint">已有密钥不会显示或回填；留空保存会继续使用原密钥</div>
+          </div>
+          <div class="cfg-field">
+            <label for="zoteroDefaultCollection">默认 Collection</label>
+            <input type="text" id="zoteroDefaultCollection" autocomplete="off" maxlength="500" required placeholder="PaperCatch/Hermes Search">
+          </div>
+          <button id="zoteroCfgSaveBtn" class="btn btn-primary" type="button" style="width:100%;margin-top:1rem">保存 Zotero 设置</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <div id="toast" class="toast"></div>
+  <div id="paperAgentModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="agentModalTitle" tabindex="-1" style="max-width:760px">
+      <div class="modal-header">
+        <div style="flex:1">
+          <h2 id="agentModalTitle">论文 Agent</h2>
+          <div id="agentPaperMeta" class="hint"></div>
+        </div>
+        <button class="btn btn-icon" data-close="paperAgentModal" aria-label="关闭论文 Agent">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="agentModeHint" class="m-note">选择“问这篇论文”或“生成学习笔记”开始。</div>
+        <div class="agent-tabs">
+          <button id="agentAskTab" class="chip" type="button" aria-pressed="true">问这篇论文</button>
+          <button id="agentNotesTab" class="chip" type="button" aria-pressed="false">生成学习笔记</button>
+        </div>
+        <div id="agentAskPanel" class="agent-panel">
+          <div class="cfg-field">
+            <label for="agentQuestion">问题</label>
+            <textarea id="agentQuestion" placeholder="例如：这篇论文的核心方法是什么？Ctrl+Enter 发送"></textarea>
+          </div>
+          <div class="agent-actions">
+            <button id="agentAskBtn" class="btn btn-primary" type="button">发送问题</button>
+          </div>
+        </div>
+        <div id="agentNotesPanel" class="agent-panel" hidden>
+          <div class="cfg-field">
+            <label for="agentFocus">学习关注点</label>
+            <textarea id="agentFocus" placeholder="例如：实验设计、核心发现、局限性"></textarea>
+          </div>
+          <div class="agent-actions">
+            <button id="agentNotesBtn" class="btn btn-primary" type="button">生成学习笔记</button>
+          </div>
+        </div>
+        <div class="m-section">
+          <div id="agentStatus" class="m-note">尚未提问。</div>
+          <div id="agentGrounded" class="hint"></div>
+        </div>
+        <div class="m-section">
+          <h3>回答</h3>
+          <div id="agentAnswer" class="m-text"></div>
+        </div>
+        <div class="m-section">
+          <h3>证据</h3>
+          <div id="agentEvidence" class="agent-evidence"></div>
+          <div id="agentNotesEvidence" class="agent-evidence" style="margin-top:.6rem"></div>
+        </div>
+        <div class="m-section">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:.8rem;flex-wrap:wrap">
+            <h3 style="margin-bottom:0">Markdown 笔记</h3>
+            <button id="agentCopyMarkdownBtn" class="btn btn-sm" type="button">复制 Markdown</button>
+          </div>
+          <pre id="agentMarkdown" class="agent-markdown"></pre>
+        </div>
+        <div id="agentEmpty" class="m-note">还没有生成内容。</div>
+      </div>
+    </div>
+  </div>
 
-  
-<script src="app.js?v=1783412342"></script>
+  <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+
+<script src="app.js?v=20260714.1"></script>
 
 </body>
 

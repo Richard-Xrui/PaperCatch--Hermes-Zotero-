@@ -1,49 +1,59 @@
-#!/usr/bin/env python3
-"""测试删除功能"""
-import requests
-import json
+"""Isolated deletion tests for the PaperCatch HTTP service."""
 
-BASE = "http://localhost:8765"
+import unittest
 
-print("=== 测试删除功能 ===\n")
+if __package__:
+    from .server_harness import IsolatedServerTestCase
+else:
+    from server_harness import IsolatedServerTestCase
 
-# 1. 获取论文列表
-try:
-    r = requests.get(f"{BASE}/api/papers")
-    data = r.json()
-    papers = data.get("papers", [])
-    print(f"1. 当前论文数: {len(papers)}")
 
-    if not papers:
-        print("   数据库为空，无法测试删除")
-        exit(0)
+class DeleteTests(IsolatedServerTestCase):
+    def test_single_delete_removes_only_requested_paper(self):
+        status, _, payload = self.request_json(
+            "DELETE", "/api/papers", {"arxiv_ids": ["2401.00002"]}
+        )
 
-    test_id = papers[-1]["arxiv_id"]  # 取最后一篇测试
-    print(f"2. 测试删除 ID: {test_id}")
-    print(f"   标题: {papers[-1].get('title', 'N/A')[:60]}...")
+        self.assertEqual(200, status)
+        self.assertTrue(payload["success"])
+        self.assertEqual(1, payload["removed"])
+        database = self.read_json(self.db_path)
+        self.assertEqual(1, database["total_count"])
+        self.assertEqual(["2401.00001"], [paper["arxiv_id"] for paper in database["papers"]])
 
-    # 2. 测试删除
-    r2 = requests.delete(
-        f"{BASE}/api/papers",
-        json={"arxiv_ids": [test_id]},
-        headers={"Content-Type": "application/json"}
-    )
-    result = r2.json()
-    print(f"\n3. 删除响应:")
-    print(f"   成功: {result.get('success')}")
-    print(f"   移除数: {result.get('removed')}")
+    def test_batch_delete_removes_each_requested_paper(self):
+        status, _, payload = self.request_json(
+            "DELETE",
+            "/api/papers",
+            {"arxiv_ids": ["2401.00001", "2401.00002"]},
+        )
 
-    # 3. 验证删除
-    r3 = requests.get(f"{BASE}/api/papers")
-    data3 = r3.json()
-    papers3 = data3.get("papers", [])
-    print(f"\n4. 删除后论文数: {len(papers3)}")
-    print(f"   差异: {len(papers) - len(papers3)} 篇")
+        self.assertEqual(200, status)
+        self.assertEqual(2, payload["removed"])
+        database = self.read_json(self.db_path)
+        self.assertEqual([], database["papers"])
+        self.assertEqual(0, database["total_count"])
 
-    if test_id not in [p["arxiv_id"] for p in papers3]:
-        print(f"   ✅ 测试 ID {test_id} 已被删除")
-    else:
-        print(f"   ❌ 测试 ID {test_id} 仍在数据库中")
+    def test_unknown_id_does_not_change_database(self):
+        status, _, payload = self.request_json(
+            "DELETE", "/api/papers", {"arxiv_ids": ["missing"]}
+        )
 
-except Exception as e:
-    print(f"❌ 测试失败: {e}")
+        self.assertEqual(200, status)
+        self.assertEqual(0, payload["removed"])
+        database = self.read_json(self.db_path)
+        self.assertEqual(2, database["total_count"])
+
+    def test_empty_delete_does_not_change_database(self):
+        status, _, payload = self.request_json(
+            "DELETE", "/api/papers", {"arxiv_ids": []}
+        )
+
+        self.assertEqual(200, status)
+        self.assertEqual(0, payload["removed"])
+        database = self.read_json(self.db_path)
+        self.assertEqual(2, database["total_count"])
+
+
+if __name__ == "__main__":
+    unittest.main()

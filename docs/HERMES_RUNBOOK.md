@@ -68,7 +68,7 @@ hook 命令会调用 `papercatch_autostart.py --ensure`。它是幂等的：Pape
 - `ZOTERO_API_KEY`
 - `ZOTERO_USER_ID`
 
-也可以写入 `config.local.json`。如果本地发现到了 user id，`python start.py --setup` 会自动预填。
+也可以写入 `config.local.json`，或在网页/桌面端进入“设置 → Zotero 集成”。如果本地发现到了 user id，`python start.py --setup` 会自动预填。页面不会回填已保存的 API Key，密钥框留空保存会保留原值。
 
 当请求里包含 collection 或前端分类规则时：
 
@@ -86,11 +86,11 @@ POST /hermes/search
 
 后端解析顺序：
 
-1. 如果配置了 `HERMES_API_URL`，调用外部 Hermes/LLM API。
-2. 如果配置了 `HERMES_COMMAND`，把 JSON 输入传给命令并读取 JSON 输出。
-3. 如果都没有，使用内置中文/英文规则解析器。
+1. 优先读取 `config.local.json` 的 `llm.api_key/base_url`。
+2. 其次读取 `DEEPSEEK_API_KEY/DEEPSEEK_BASE_URL`。
+3. LLM 未配置、返回无效结果或调用失败时，使用内置中文/英文规则解析器。
 
-外部 Hermes 应返回类似：
+`HERMES_API_URL` 和 `HERMES_COMMAND` 目前用于本地发现与状态配置，尚未接入 `/hermes/search` 调用链。LLM 解析结果应符合类似结构：
 
 ```json
 {
@@ -103,7 +103,7 @@ POST /hermes/search
 }
 ```
 
-如果外部 Hermes 失败，系统会自动回落到内置解析器，并在返回的 `warnings` 里说明。
+LLM 解析失败时系统会自动回落到内置解析器，响应中的 `llm_used` 为 `false`；`warnings` 当前用于论文合并后的本地增强失败，不代表查询解析回落。
 
 ## 每日自动抓取和邮件
 
@@ -132,7 +132,7 @@ python cron_wrapper.py
 1. 先运行 `python start.py --discover` 看本机发现情况。
 2. 再运行 `python start.py --doctor` 看 PaperCatch 当前配置。
 3. 如果 Zotero local found 但 Zotero not configured，运行 `python start.py --setup`，确认路径并补 API key。
-4. 如果 Hermes local found 但 Hermes mode 是 builtin，运行 `python start.py --setup`，确认 Hermes command 或填 `HERMES_API_URL`。
+4. “问 Hermes”显示 `llm_used=false` 时，检查 `llm.api_key/base_url` 或 `DEEPSEEK_API_KEY/DEEPSEEK_BASE_URL`；不配置也可继续使用内置规则解析器。
 5. 如果邮件是 off，运行 `python start.py --setup` 填 SMTP。
 6. 如果前端打不开，确认 `python start.py` 仍在运行，并访问 `http://localhost:8765/health`。
 

@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Smart paper classification. Uses keyword matching + AI fallback."""
-import json
+"""Classify papers with local keyword rules."""
+
+from __future__ import annotations
+
 from pathlib import Path
+
+from json_store import locked_update_json, read_json
+
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "papers_database.json"
 CATS_PATH = BASE_DIR / "papercatch_categories.json"
 
-# Category matching rules (internal, for auto-classification only)
 CAT_RULES = {
     "llm": ["llm", "language model", "transformer", "gpt", "agent", "智能体", "prompt", "alignment", "对齐", "safety", "安全", "rlhf", "unlearning", "遗忘", "reasoning", "推理", "verification", "验证", "tool", "工具"],
     "cv": ["vision", "视觉", "image", "图像", "video", "视频", "recognition", "识别", "detection", "检测", "segmentation", "分割", "face", "人脸", "vlm", "多模态", "multimodal", "camera", "相机"],
@@ -21,44 +25,64 @@ CAT_RULES = {
     "benchmark": ["benchmark", "基准", "evaluation", "评估", "test", "测试", "diagnose", "诊断", "comparison", "比较", "dataset", "数据集", "survey", "综述"],
 }
 
-def classify(paper):
-    text = (paper.get("title","") + " " + paper.get("abstract","") + " " + (paper.get("title_cn","")) + " " + (paper.get("abstract_cn",""))).lower()
-    
-    scores = {}
-    for cat_id, keywords in CAT_RULES.items():
-        score = sum(1 for kw in keywords if kw in text)
-        if score > 0:
-            scores[cat_id] = score
-    
-    ranked = sorted(scores.items(), key=lambda x: -x[1])
-    
-    # Return top 2 matches
+
+def classify(paper: dict, categories: list[dict] | None = None) -> list[dict]:
+    categories = categories or []
+    text = (
+        paper.get("title", "")
+        + " "
+        + paper.get("abstract", "")
+        + " "
+        + paper.get("title_cn", "")
+        + " "
+        + paper.get("abstract_cn", "")
+    ).lower()
+    scores = {
+        category_id: sum(1 for keyword in keywords if keyword in text)
+        for category_id, keywords in CAT_RULES.items()
+    }
+    ranked = sorted(
+        ((category_id, score) for category_id, score in scores.items() if score > 0),
+        key=lambda item: -item[1],
+    )
     result = []
-    for cat_id, _ in ranked[:2]:
-        label = next((c["label"] for c in CATEGORIES if c["id"] == cat_id), cat_id)
-        result.append({"id": cat_id, "label": label, "zotero_path": "PaperCatch/" + label})
-    
-    if not result:
-        result = [{"id": "llm", "label": "大语言模型", "zotero_path": "PaperCatch/大语言模型"}]
-    return result
+    for category_id, _ in ranked[:2]:
+        label = next(
+            (category.get("label") for category in categories if category.get("id") == category_id),
+            category_id,
+        )
+        result.append({"id": category_id, "label": label, "zotero_path": "PaperCatch/" + label})
+    return result or [{"id": "llm", "label": "大语言模型", "zotero_path": "PaperCatch/大语言模型"}]
 
 
-if not CATS_PATH.exists():
-    print("No categories file")
-    exit(0)
+def classify_database(db_path: Path = DB_PATH, categories_path: Path = CATS_PATH) -> int:
+    db_path = Path(db_path)
+    categories_path = Path(categories_path)
+    if not db_path.exists() or not categories_path.exists():
+        return 0
+    categories = read_json(categories_path, [])
+    classified = 0
 
-with open(CATS_PATH, "r", encoding="utf-8") as f:
-    CATEGORIES = json.load(f)
+    def update(db):
+        nonlocal classified
+        for paper in db.get("papers", []):
+            paper["papercatch_cats"] = classify(paper, categories)
+            classified += 1
+        return db
 
-with open(DB_PATH, "r", encoding="utf-8") as f:
-    db = json.load(f)
+    locked_update_json(
+        db_path,
+        {"updated_at": "", "total_count": 0, "categories": [], "papers": []},
+        update,
+    )
+    return classified
 
-count = 0
-for p in db.get("papers", []):
-    p["papercatch_cats"] = classify(p)
-    count += 1
 
-with open(DB_PATH, "w", encoding="utf-8") as f:
-    json.dump(db, f, ensure_ascii=False, indent=2)
+def main() -> int:
+    count = classify_database()
+    print(f"Classified {count} papers")
+    return 0
 
-print(f"Classified {count} papers")
+
+if __name__ == "__main__":
+    raise SystemExit(main())

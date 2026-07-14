@@ -12,11 +12,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
+from json_store import locked_update_json, read_json, write_json_atomic
+
+MODULE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(os.environ.get("PAPERCATCH_DATA_DIR", MODULE_DIR)).expanduser().resolve()
 DB_PATH = BASE_DIR / "papers_database.json"
 PENDING_PATH = BASE_DIR / "pending_enrichment.json"
 
@@ -98,34 +102,58 @@ def compute_quality(paper: dict) -> tuple[float | None, dict]:
     return round(min(10, max(0, score)), 1), signals
 
 
-def local_enrich(force: bool = False) -> int:
+def local_enrich(force: bool = False, db_path: Path = DB_PATH) -> int:
     """Generate tags and quality scores for papers without LLM."""
-    if not DB_PATH.exists():
+    db_path = Path(db_path)
+    if not db_path.exists():
         return 0
-    with open(DB_PATH, "r", encoding="utf-8") as f:
-        db = json.load(f)
     updated = 0
-    for p in db["papers"]:
-        if force or not p.get("tags"):
-            p["tags"] = extract_tags(p)
-            updated += 1
-        if force or p.get("quality_score") is None:
-            score, signals = compute_quality(p)
-            p["quality_score"] = score
-            p["quality_signals"] = signals
-            updated += 1
-    if updated:
-        with open(DB_PATH, "w", encoding="utf-8") as f:
-            json.dump(db, f, ensure_ascii=False, indent=2)
+
+    def update(db: dict) -> dict:
+        nonlocal updated
+        for paper in db.get("papers", []):
+            old_tags = paper.get("tags")
+            old_score = paper.get("quality_score")
+            old_signals = paper.get("quality_signals")
+            tags_missing = "tags" not in paper or old_tags is None
+            signals_unset = old_signals is None or old_signals == {}
+            tags_placeholder = old_tags == [] and old_score is None and signals_unset
+            if force or tags_missing or tags_placeholder:
+                tags = extract_tags(paper)
+                if old_tags != tags:
+                    paper["tags"] = tags
+                    updated += 1
+
+            score_missing = old_score is None
+            signals_missing = old_signals is None
+            if force or score_missing or signals_missing:
+                score, signals = compute_quality(paper)
+                quality_changed = False
+                if (force or score_missing) and old_score != score:
+                    paper["quality_score"] = score
+                    quality_changed = True
+                if (force or signals_missing) and old_signals != signals:
+                    paper["quality_signals"] = signals
+                    quality_changed = True
+                if quality_changed:
+                    updated += 1
+        return db
+
+    locked_update_json(
+        db_path,
+        {"updated_at": "", "total_count": 0, "categories": [], "papers": []},
+        update,
+    )
     return updated
 
 
-def mark_pending() -> int:
+def mark_pending(db_path: Path = DB_PATH, pending_path: Path = PENDING_PATH) -> int:
     """Mark papers needing LLM Chinese content."""
-    if not DB_PATH.exists():
+    db_path = Path(db_path)
+    pending_path = Path(pending_path)
+    if not db_path.exists():
         return 0
-    with open(DB_PATH, "r", encoding="utf-8") as f:
-        db = json.load(f)
+    db = read_json(db_path, {"papers": []})
     pending = []
     for p in db["papers"]:
         needs = []
@@ -144,36 +172,47 @@ def mark_pending() -> int:
                 "marked_at": datetime.now(timezone.utc).isoformat(),
             })
     if pending:
-        with open(PENDING_PATH, "w", encoding="utf-8") as f:
-            json.dump(pending, f, ensure_ascii=False, indent=2)
+        write_json_atomic(pending_path, pending)
     else:
-        if PENDING_PATH.exists():
-            PENDING_PATH.unlink()
+        if pending_path.exists():
+            pending_path.unlink()
     return len(pending)
 
 
-def apply_batch(batch_path: str) -> int:
+def apply_batch(batch_path: str, db_path: Path = DB_PATH) -> int:
     """Apply LLM-generated Chinese content to database."""
     FIELDS = ["title_cn", "abstract_cn", "summary_cn", "background_cn",
               "affiliations", "tags", "quality_score", "quality_signals"]
-    with open(batch_path, "r", encoding="utf-8") as f:
-        items = json.load(f)
+    batch_path = Path(batch_path)
+    db_path = Path(db_path)
+    if not batch_path.exists():
+        raise FileNotFoundError(batch_path)
+    items = read_json(batch_path, [])
     if isinstance(items, dict):
         items = items.get("items", [])
-    with open(DB_PATH, "r", encoding="utf-8") as f:
-        db = json.load(f)
-    index = {p["arxiv_id"]: p for p in db.get("papers", [])}
     updated = 0
-    for item in items:
-        paper = index.get(item.get("arxiv_id"))
-        if not paper:
-            continue
-        for field in FIELDS:
-            if field in item and item[field] not in (None, ""):
-                paper[field] = item[field]
-        updated += 1
-    with open(DB_PATH, "w", encoding="utf-8") as f:
-        json.dump(db, f, ensure_ascii=False, indent=2)
+
+    def update(db: dict) -> dict:
+        nonlocal updated
+        index = {paper["arxiv_id"]: paper for paper in db.get("papers", [])}
+        for item in items:
+            paper = index.get(item.get("arxiv_id"))
+            if not paper:
+                continue
+            changed = False
+            for field in FIELDS:
+                if field in item and item[field] not in (None, "") and paper.get(field) != item[field]:
+                    paper[field] = item[field]
+                    changed = True
+            if changed:
+                updated += 1
+        return db
+
+    locked_update_json(
+        db_path,
+        {"updated_at": "", "total_count": 0, "categories": [], "papers": []},
+        update,
+    )
     return updated
 
 
